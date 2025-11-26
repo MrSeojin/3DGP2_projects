@@ -37,6 +37,8 @@ CPlayer::~CPlayer()
 	ReleaseShaderVariables();
 
 	if (m_pCamera) delete m_pCamera;
+
+	if (m_pShader) m_pShader->Release();
 }
 
 void CPlayer::CreateShaderVariables(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList)
@@ -229,7 +231,11 @@ void CPlayer::OnPrepareRender()
 void CPlayer::Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera)
 {
 	DWORD nCameraMode = (pCamera) ? pCamera->GetMode() : 0x00;
-	if (nCameraMode == THIRD_PERSON_CAMERA) CGameObject::Render(pd3dCommandList, pCamera);
+	if (nCameraMode == THIRD_PERSON_CAMERA)
+	{
+		if (m_pShader) m_pShader->Render(pd3dCommandList, pCamera, 0);
+		CGameObject::Render(pd3dCommandList, pCamera);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -239,14 +245,13 @@ CAirplanePlayer::CAirplanePlayer(ID3D12Device* pd3dDevice, ID3D12GraphicsCommand
 {
 	m_pCamera = ChangeCamera(/*SPACESHIP_CAMERA*/THIRD_PERSON_CAMERA, 0.0f);
 
-	//	CGameObject *pGameObject = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, pd3dGraphicsRootSignature, "Model/Apache.bin");
-	CGameObject* pGameObject = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, pd3dGraphicsRootSignature, "Model/Gunship.bin");
+	m_pShader = new CPlayerShader();
+	m_pShader->CreateShader(pd3dDevice, pd3dCommandList, pd3dGraphicsRootSignature);
 
-	pGameObject->Rotate(15.0f, 0.0f, 0.0f);
-	pGameObject->SetScale(8.5f, 8.5f, 8.5f);
-	SetChild(pGameObject, true);
+	CGameObject* pGameObject = CGameObject::LoadGeometryFromFile(pd3dDevice, pd3dCommandList, pd3dGraphicsRootSignature, "Model/Mi24.bin", m_pShader);
+	SetChild(pGameObject);
 
-	OnInitialize();
+	PrepareAnimate();
 
 	CreateShaderVariables(pd3dDevice, pd3dCommandList);
 }
@@ -255,13 +260,10 @@ CAirplanePlayer::~CAirplanePlayer()
 {
 }
 
-void CAirplanePlayer::OnInitialize()
+void CAirplanePlayer::PrepareAnimate()
 {
-	//	m_pMainRotorFrame = FindFrame("rotor");
-	//	m_pTailRotorFrame = FindFrame("black_m_7");
-
-	m_pMainRotorFrame = FindFrame("Rotor");
-	m_pTailRotorFrame = FindFrame("Back_Rotor");
+	m_pMainRotorFrame = FindFrame("Top_Rotor");
+	m_pTailRotorFrame = FindFrame("Tail_Rotor");
 }
 
 void CAirplanePlayer::Animate(float fTimeElapsed, XMFLOAT4X4* pxmf4x4Parent)
@@ -319,10 +321,11 @@ CCamera* CAirplanePlayer::ChangeCamera(DWORD nNewCameraMode, float fTimeElapsed)
 		SetFriction(20.5f);
 		SetGravity(XMFLOAT3(0.0f, 0.0f, 0.0f));
 		SetMaxVelocityXZ(25.5f);
-		SetMaxVelocityY(40.0f);
+		SetMaxVelocityY(20.0f);
 		m_pCamera = OnChangeCamera(THIRD_PERSON_CAMERA, nCurrentCameraMode);
 		m_pCamera->SetTimeLag(0.25f);
-		m_pCamera->SetOffset(XMFLOAT3(0.0f, 105.0f, -140.0f));
+		m_pCamera->SetOffset(XMFLOAT3(0.0f, 15.0f, -30.0f));
+		m_pCamera->SetPosition(Vector3::Add(m_xmf3Position, m_pCamera->GetOffset()));
 		m_pCamera->GenerateProjectionMatrix(1.01f, 5000.0f, ASPECT_RATIO, 60.0f);
 		m_pCamera->SetViewport(0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT, 0.0f, 1.0f);
 		m_pCamera->SetScissorRect(0, 0, FRAME_BUFFER_WIDTH, FRAME_BUFFER_HEIGHT);
@@ -330,8 +333,6 @@ CCamera* CAirplanePlayer::ChangeCamera(DWORD nNewCameraMode, float fTimeElapsed)
 	default:
 		break;
 	}
-
-	m_pCamera->SetPosition(Vector3::Add(m_xmf3Position, m_pCamera->GetOffset()));
 	Update(fTimeElapsed);
 
 	return(m_pCamera);

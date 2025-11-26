@@ -1,91 +1,92 @@
+//--------------------------------------------------------------------------------------
+// File: DDSTextureLoader12.h
+//
+// Functions for loading a DDS texture and creating a Direct3D runtime resource for it
+//
+// Note these functions are useful as a light-weight runtime loader for DDS files. For
+// a full-featured DDS file reader, writer, and texture processing pipeline see
+// the 'Texconv' sample and the 'DirectXTex' library.
+//
+// THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
+// ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
+// PARTICULAR PURPOSE.
+//
+// Copyright (c) Microsoft Corporation. All rights reserved.
+//
+// http://go.microsoft.com/fwlink/?LinkId=248926
+// http://go.microsoft.com/fwlink/?LinkID=615561
+//--------------------------------------------------------------------------------------
+
 #pragma once
+#include <assert.h>
+#include <algorithm>
+#include <memory>
+#include <wrl.h>
 
-#define FRAME_BUFFER_WIDTH		640
-#define FRAME_BUFFER_HEIGHT		480
+#include "d3dx12.h"
 
-#include "Timer.h"
-#include "Player.h"
-#include "Scene.h"
-
-class CGameFramework
+namespace DirectX
 {
-public:
-	CGameFramework();
-	~CGameFramework();
+    enum DDS_ALPHA_MODE
+    {
+        DDS_ALPHA_MODE_UNKNOWN = 0,
+        DDS_ALPHA_MODE_STRAIGHT = 1,
+        DDS_ALPHA_MODE_PREMULTIPLIED = 2,
+        DDS_ALPHA_MODE_OPAQUE = 3,
+        DDS_ALPHA_MODE_CUSTOM = 4,
+    };
 
-	bool OnCreate(HINSTANCE hInstance, HWND hMainWnd);
-	void OnDestroy();
+    enum DDS_LOADER_FLAGS
+    {
+        DDS_LOADER_DEFAULT = 0,
+        DDS_LOADER_FORCE_SRGB = 0x1,
+        DDS_LOADER_MIP_RESERVE = 0x8,
+    };
 
-	void CreateSwapChain();
-	void CreateDirect3DDevice();
-	void CreateCommandQueueAndList();
+    // Standard version
+    HRESULT __cdecl LoadDDSTextureFromMemory(
+        _In_ ID3D12Device* d3dDevice,
+        _In_reads_bytes_(ddsDataSize) const uint8_t* ddsData,
+        size_t ddsDataSize,
+        _Outptr_ ID3D12Resource** texture,
+        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        size_t maxsize = 0,
+        _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
+        _Out_opt_ bool* isCubeMap = nullptr);
 
-	void CreateRtvAndDsvDescriptorHeaps();
+    HRESULT __cdecl LoadDDSTextureFromFile(
+        _In_ ID3D12Device* d3dDevice,
+        _In_z_ const wchar_t* szFileName,
+        _Outptr_ ID3D12Resource** texture,
+        std::unique_ptr<uint8_t[]>& ddsData,
+        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        size_t maxsize = 0,
+        _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
+        _Out_opt_ bool* isCubeMap = nullptr);
 
-	void CreateRenderTargetViews();
-	void CreateDepthStencilView();
+    // Extended version
+    HRESULT __cdecl LoadDDSTextureFromMemoryEx(
+        _In_ ID3D12Device* d3dDevice,
+        _In_reads_bytes_(ddsDataSize) const uint8_t* ddsData,
+        size_t ddsDataSize,
+        size_t maxsize,
+        D3D12_RESOURCE_FLAGS resFlags,
+        unsigned int loadFlags,
+        _Outptr_ ID3D12Resource** texture,
+        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
+        _Out_opt_ bool* isCubeMap = nullptr);
 
-	void ChangeSwapChainState();
-
-	void BuildObjects();
-	void ReleaseObjects();
-
-	void ProcessInput();
-	void AnimateObjects();
-	void FrameAdvance();
-
-	void WaitForGpuComplete();
-	void MoveToNextFrame();
-
-	void OnProcessingMouseMessage(HWND hWnd, UINT nMessageID, WPARAM wParam, LPARAM lParam);
-	void OnProcessingKeyboardMessage(HWND hWnd, UINT nMessageID, WPARAM wParam, LPARAM lParam);
-	LRESULT CALLBACK OnProcessingWindowMessage(HWND hWnd, UINT nMessageID, WPARAM wParam, LPARAM lParam);
-
-private:
-	HINSTANCE					m_hInstance;
-	HWND						m_hWnd;
-
-	int							m_nWndClientWidth;
-	int							m_nWndClientHeight;
-
-	IDXGIFactory4* m_pdxgiFactory = NULL;
-	IDXGISwapChain3* m_pdxgiSwapChain = NULL;
-	ID3D12Device* m_pd3dDevice = NULL;
-
-	bool						m_bMsaa4xEnable = false;
-	UINT						m_nMsaa4xQualityLevels = 0;
-
-	static const UINT			m_nSwapChainBuffers = 2;
-	UINT						m_nSwapChainBufferIndex;
-
-	ID3D12Resource* m_ppd3dSwapChainBackBuffers[m_nSwapChainBuffers];
-	ID3D12DescriptorHeap* m_pd3dRtvDescriptorHeap = NULL;
-	UINT						m_nRtvDescriptorIncrementSize;
-
-	ID3D12Resource* m_pd3dDepthStencilBuffer = NULL;
-	ID3D12DescriptorHeap* m_pd3dDsvDescriptorHeap = NULL;
-	UINT						m_nDsvDescriptorIncrementSize;
-
-	ID3D12CommandAllocator* m_pd3dCommandAllocator = NULL;
-	ID3D12CommandQueue* m_pd3dCommandQueue = NULL;
-	ID3D12GraphicsCommandList* m_pd3dCommandList = NULL;
-
-	ID3D12Fence* m_pd3dFence = NULL;
-	UINT64						m_nFenceValues[m_nSwapChainBuffers];
-	HANDLE						m_hFenceEvent;
-
-#if defined(_DEBUG)
-	ID3D12Debug* m_pd3dDebugController;
-#endif
-
-	CGameTimer					m_GameTimer;
-
-	CScene* m_pScene = NULL;
-	CPlayer* m_pPlayer = NULL;
-	CCamera* m_pCamera = NULL;
-
-	POINT						m_ptOldCursorPos;
-
-	_TCHAR						m_pszFrameRate[70];
-};
-
+    HRESULT __cdecl LoadDDSTextureFromFileEx(
+        _In_ ID3D12Device* d3dDevice,
+        _In_z_ const wchar_t* szFileName,
+        size_t maxsize,
+        D3D12_RESOURCE_FLAGS resFlags,
+        unsigned int loadFlags,
+        _Outptr_ ID3D12Resource** texture,
+        std::unique_ptr<uint8_t[]>& ddsData,
+        std::vector<D3D12_SUBRESOURCE_DATA>& subresources,
+        _Out_opt_ DDS_ALPHA_MODE* alphaMode = nullptr,
+        _Out_opt_ bool* isCubeMap = nullptr);
+}
